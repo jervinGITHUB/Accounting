@@ -1,0 +1,174 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: #f5f6f2;
+  --color-ink: #17211b;
+  --color-muted: #718078;
+  --color-line: #e4e8e2;
+  --color-brand: #16855b;
+  --color-brand-dark: #106c49;
+  --color-sidebar: #14251e;
+  --shadow-card: 0 1px 2px rgb(20 37 30 / 0.03), 0 8px 24px rgb(20 37 30 / 0.035);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--color-canvas);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.field-invalid {
+  outline: 2px solid #f43f5e !important;
+  outline-offset: 2px;
+}
+
+.basic-mode main .text-xs {
+  font-size: 0.875rem;
+  line-height: 1.35rem;
+}
+
+.basic-mode main .text-sm {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.basic-mode .workspace-page .text-\[10px\],
+.basic-mode .workspace-page .text-\[9px\] {
+  font-size: 0.75rem;
+  line-height: 1.1rem;
+}
+
+.basic-mode main button {
+  min-height: 2.75rem;
+}
+
+.basic-mode > aside nav button {
+  min-height: 3rem;
+  font-size: 0.9375rem;
+}
+
+.basic-mode .workspace-page {
+  max-width: 64rem;
+}
+
+.basic-mode .workspace-page input,
+.basic-mode .workspace-page select,
+.basic-mode .workspace-page textarea {
+  min-height: 3rem;
+  font-size: 1rem;
+}
+
+.basic-mode .workspace-page section,
+.basic-mode .workspace-page form {
+  border-radius: 1rem;
+}
+
+.basic-mode .workspace-page h1 {
+  font-size: 2rem;
+  line-height: 2.5rem;
+}
+
+::selection {
+  background: #bdebd5;
+  color: #0b4f35;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #c9d0cb;
+  background-clip: padding-box;
+}
+
+@keyframes action-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  55% {
+    transform: scale(1.035);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes check-draw {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-18deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes search-results {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-action-pop {
+  animation: action-pop 360ms ease-out;
+}
+
+.animate-check-draw {
+  animation: check-draw 260ms ease-out both;
+}
+
+.animate-toast-in {
+  animation: toast-in 300ms ease-out both;
+}
+
+.animate-search-results {
+  transform-origin: top;
+  animation: search-results 180ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-action-pop,
+  .animate-check-draw,
+  .animate-toast-in,
+  .animate-search-results {
+    animation: none;
+  }
+}
