@@ -1,5 +1,21 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
+import type { Product, CustomerDebt, PendingPayment, SupplierOrder, Receipt, TransactionRecord } from "./types/store";
+import {
+  INITIAL_PRODUCTS,
+  DEFAULT_CATEGORIES,
+  INITIAL_CUSTOMER_DEBTS,
+  INITIAL_PENDING_PAYMENTS,
+  INITIAL_SUPPLIER_ORDERS,
+  INITIAL_RECEIPTS,
+  INITIAL_TRANSACTIONS,
+} from "./data/initialStoreData";
+import { ReceiptModal } from "./components/ReceiptModal";
+import { AddProductModal, EditProductModal } from "./components/ProductModals";
+import { PosSalesModal } from "./components/PosSalesModal";
+import { DebtsView } from "./components/DebtsView";
+import { SupplierOrdersView } from "./components/SupplierOrdersView";
+import { ReceiptsView } from "./components/ReceiptsView";
 
 type IconName =
   | "grid"
@@ -52,8 +68,12 @@ function Icon({ name, className = "size-5" }: { name: IconName; className?: stri
 
 const navigation: { label: string; icon: IconName; path: string }[] = [
   { label: "Overview", icon: "grid", path: "/" },
-  { label: "Journal", icon: "ledger", path: "/journal" },
+  { label: "Sales & POS", icon: "cash", path: "/pos" },
   { label: "Inventory", icon: "box", path: "/inventory" },
+  { label: "Debts & Payables", icon: "wallet", path: "/debts" },
+  { label: "Supplier Orders", icon: "cart", path: "/supplier-orders" },
+  { label: "Receipts", icon: "receipt", path: "/receipts" },
+  { label: "Journal", icon: "ledger", path: "/journal" },
   { label: "Reports", icon: "chart", path: "/reports" },
   { label: "Team", icon: "users", path: "/team" },
   { label: "History", icon: "history", path: "/history" },
@@ -147,17 +167,7 @@ const ledgerAccounts: Record<string, { code: string; type: string; opening: stri
   "Accounts payable": { code: "2010", type: "Current liability", opening: "₱65,490.00", rows: [["Nov 18","PR-1047","JE-1047","Coca-Cola restock","₱6,850.00","₱72,340.00"],["Nov 16","PR-1040","JE-1040","Snack restock","₱4,220.00","₱65,490.00"]] },
 };
 
-const productCatalog = [
-  { slug: "bottled-water-500ml", name: "Bottled water 500ml", sku: "BEV-001", category: "Beverages", stock: 48, reorder: 12, price: "₱30.00", unitsSold: 428, revenue: "₱12,840" },
-  { slug: "coca-cola-1-5l", name: "Coca-Cola 1.5L", sku: "BEV-014", category: "Beverages", stock: 6, reorder: 18, price: "₱78.00", unitsSold: 186, revenue: "₱14,508" },
-  { slug: "canned-sardines", name: "Canned sardines", sku: "CAN-008", category: "Canned goods", stock: 10, reorder: 15, price: "₱32.00", unitsSold: 214, revenue: "₱6,848" },
-  { slug: "cheese-flavored-chips", name: "Cheese-flavored chips", sku: "SNK-021", category: "Snacks", stock: 22, reorder: 10, price: "₱25.00", unitsSold: 296, revenue: "₱7,400" },
-  { slug: "chocolate-biscuits", name: "Chocolate biscuits", sku: "SNK-017", category: "Snacks", stock: 8, reorder: 12, price: "₱18.00", unitsSold: 245, revenue: "₱4,410" },
-  { slug: "instant-noodles", name: "Instant noodles", sku: "DRY-003", category: "Dry goods", stock: 32, reorder: 20, price: "₱22.00", unitsSold: 374, revenue: "₱8,228" },
-  { slug: "laundry-detergent-sachet", name: "Laundry detergent sachet", sku: "HOU-011", category: "Household", stock: 41, reorder: 15, price: "₱12.00", unitsSold: 168, revenue: "₱2,016" },
-  { slug: "powdered-milk", name: "Powdered milk", sku: "DRY-019", category: "Dry goods", stock: 9, reorder: 12, price: "₱15.00", unitsSold: 132, revenue: "₱1,980" },
-  { slug: "three-in-one-coffee", name: "3-in-1 coffee", sku: "BEV-009", category: "Beverages", stock: 27, reorder: 15, price: "₱12.00", unitsSold: 341, revenue: "₱4,092" },
-];
+const productCatalog: Product[] = INITIAL_PRODUCTS;
 
 function Logo({ dark = false }: { dark?: boolean }) {
   return (
@@ -437,6 +447,10 @@ function validateMeaningfulText(event: FormEvent<HTMLInputElement | HTMLTextArea
 }
 
 const pageMeta: Record<string, { eyebrow: string; title: string; description: string }> = {
+  "/pos": { eyebrow: "Sales & POS", title: "Sales register & POS", description: "Record daily customer transactions, compute change, update inventory, and issue official receipts." },
+  "/debts": { eyebrow: "Credit & Accounts", title: "Debts & pending payments", description: "Track customer credit balances (pautang) and upcoming supplier bills." },
+  "/supplier-orders": { eyebrow: "Procurement", title: "Supplier orders & restock", description: "Order from wholesale distributors and restock inventory directly." },
+  "/receipts": { eyebrow: "Sales audit", title: "Customer receipts & sales slips", description: "Search, print, and audit customer official receipts and payment proof." },
   "/journal": { eyebrow: "Accounting", title: "General journal", description: "Review, filter, and manage every transaction recorded for Corner Market." },
   "/ledger": { eyebrow: "Accounting", title: "General ledger", description: "Review posted transactions by account, posting reference, and running balance." },
   "/trial-balance": { eyebrow: "Accounting control", title: "Trial balance", description: "Confirm that total debits and credits remain balanced for the selected period." },
@@ -458,7 +472,7 @@ const pageMeta: Record<string, { eyebrow: string; title: string; description: st
   "/reports/statements": { eyebrow: "Report", title: "Financial statements", description: "Review close controls and generate November’s financial statements." },
 };
 
-function BasicSectionPage({ pathname, navigate, activityLog }: { pathname: string; navigate: (path: string) => void; activityLog: ActivityRecord[] }) {
+function BasicSectionPage({ pathname, navigate, activityLog, products, transactions }: { pathname: string; navigate: (path: string) => void; activityLog: ActivityRecord[]; products: Product[]; transactions: TransactionRecord[] }) {
   const section = pathname.startsWith("/inventory") ? "products" : pathname.slice(1);
   const titles: Record<string, [string, string]> = {
     journal: ["Record money", "Choose what happened in the store. SariLedger will guide the accounting."],
@@ -467,15 +481,15 @@ function BasicSectionPage({ pathname, navigate, activityLog }: { pathname: strin
     team: ["People", "See who can use the system and manage their access."],
     history: ["Activity", "Review important changes made in the system."],
   };
-  const [title, description] = titles[section];
+  const [title, description] = titles[section] || ["Section", "Manage your store records."];
   return (
     <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
       <button onClick={() => navigate("/")} className="mb-5 flex items-center gap-1.5 text-sm font-bold text-muted"><Icon name="chevron" className="size-4 rotate-180" />Back to Home</button>
       <section className="rounded-3xl bg-sidebar p-6 text-white shadow-xl sm:p-8"><p className="text-sm font-semibold text-emerald-300">Basic mode</p><h1 className="mt-2 text-3xl font-bold">{title}</h1><p className="mt-2 max-w-2xl text-base leading-relaxed text-white/60">{description}</p></section>
 
-      {section === "journal" && <><section className="mt-5 grid gap-4 sm:grid-cols-3">{[["Record a sale","Customer paid by cash, GCash, or credit","cash","/journal/new?type=sales-entry","bg-emerald-50 text-emerald-700"],["Record a purchase","Stock arrived from a supplier","cart","/journal/new?type=purchase-entry","bg-sky-50 text-sky-700"],["Record an expense","The store paid a bill or other cost","receipt","/journal/new?type=expense-entry","bg-amber-50 text-amber-700"]].map(([label,note,icon,path,tone]) => <button key={label} onClick={() => navigate(path)} className="flex min-h-40 flex-col items-start rounded-2xl border border-line bg-white p-5 text-left shadow-card transition hover:border-brand/30"><span className={`grid size-12 place-items-center rounded-2xl ${tone}`}><Icon name={icon as IconName} className="size-6" /></span><span className="mt-4 text-lg font-bold">{label}</span><span className="mt-1 text-sm leading-relaxed text-muted">{note}</span></button>)}</section><section className="mt-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card"><div className="flex items-center justify-between border-b border-line p-5"><h2 className="text-lg font-bold">Recent records</h2><button onClick={() => navigate("/ledger")} className="flex items-center gap-1.5 text-sm font-bold text-brand">Ledger details <Icon name="arrow" className="size-4" /></button></div>{transactions.slice(0,3).map((item) => <button key={item.ref} onClick={() => navigate(`/journal/${item.ref}`)} className="flex w-full items-center gap-3 border-b border-line p-4 text-left last:border-0"><span className="grid size-11 place-items-center rounded-xl bg-canvas text-brand"><Icon name={item.icon} className="size-5" /></span><span className="flex-1"><span className="block text-base font-bold">{item.title}</span><span className="mt-1 block text-sm text-muted">{item.detail}</span></span><span className="text-base font-bold">{item.amount}</span><Icon name="chevron" className="size-5 text-muted" /></button>)}</section></>}
+      {section === "journal" && <><section className="mt-5 grid gap-4 sm:grid-cols-3">{[["Record a sale","Customer paid by cash, GCash, or credit","cash","/pos","bg-emerald-50 text-emerald-700"],["Record a purchase","Stock arrived from a supplier","cart","/supplier-orders","bg-sky-50 text-sky-700"],["Record an expense","The store paid a bill or other cost","receipt","/journal/new?type=expense-entry","bg-amber-50 text-amber-700"]].map(([label,note,icon,path,tone]) => <button key={label} onClick={() => navigate(path)} className="flex min-h-40 flex-col items-start rounded-2xl border border-line bg-white p-5 text-left shadow-card transition hover:border-brand/30"><span className={`grid size-12 place-items-center rounded-2xl ${tone}`}><Icon name={icon as IconName} className="size-6" /></span><span className="mt-4 text-lg font-bold">{label}</span><span className="mt-1 text-sm leading-relaxed text-muted">{note}</span></button>)}</section><section className="mt-5 overflow-hidden rounded-2xl border border-line bg-white shadow-card"><div className="flex items-center justify-between border-b border-line p-5"><h2 className="text-lg font-bold">Recent records</h2><button onClick={() => navigate("/ledger")} className="flex items-center gap-1.5 text-sm font-bold text-brand">Ledger details <Icon name="arrow" className="size-4" /></button></div>{transactions.slice(0,3).map((item) => <button key={item.ref} onClick={() => navigate(`/journal/${item.ref}`)} className="flex w-full items-center gap-3 border-b border-line p-4 text-left last:border-0"><span className="grid size-11 place-items-center rounded-xl bg-canvas text-brand"><Icon name={item.icon as IconName} className="size-5" /></span><span className="flex-1"><span className="block text-base font-bold">{item.title}</span><span className="mt-1 block text-sm text-muted">{item.detail}</span></span><span className="text-base font-bold">{item.amount}</span><Icon name="chevron" className="size-5 text-muted" /></button>)}</section></>}
 
-      {section === "products" && <><section className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-line bg-white p-5 shadow-card"><p className="text-sm text-muted">All products</p><p className="mt-2 text-2xl font-bold">{productCatalog.length}</p></div><button onClick={() => navigate("/inventory/stocks?filter=low")} className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-card"><p className="text-sm text-amber-800">Need restocking</p><p className="mt-2 text-2xl font-bold text-amber-900">{productCatalog.filter((product) => product.stock <= product.reorder).length}</p></button><button onClick={() => navigate("/inventory/count/new")} className="col-span-2 flex items-center justify-center gap-2 rounded-2xl bg-brand p-5 text-base font-bold text-white sm:col-span-1"><Icon name="box" className="size-5" />Count stock</button></section><section className="mt-5 grid gap-3 sm:grid-cols-2">{productCatalog.map((product) => <button key={product.slug} onClick={() => navigate(`/inventory/products/${product.slug}`)} className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4 text-left shadow-card"><span className="grid size-12 place-items-center rounded-xl bg-canvas text-brand"><Icon name="box" className="size-6" /></span><span className="min-w-0 flex-1"><span className="block truncate text-base font-bold">{product.name}</span><span className="mt-1 block text-sm text-muted">{product.stock} in stock · {product.price}</span></span><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${product.stock <= product.reorder ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{product.stock <= product.reorder ? "Low" : "Good"}</span></button>)}</section></>}
+      {section === "products" && <><section className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-line bg-white p-5 shadow-card"><p className="text-sm text-muted">All products</p><p className="mt-2 text-2xl font-bold">{products.length}</p></div><button onClick={() => navigate("/inventory/stocks?filter=low")} className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left shadow-card"><p className="text-sm text-amber-800">Need restocking</p><p className="mt-2 text-2xl font-bold text-amber-900">{products.filter((product) => product.stock <= product.reorder).length}</p></button><button onClick={() => navigate("/inventory/count/new")} className="col-span-2 flex items-center justify-center gap-2 rounded-2xl bg-brand p-5 text-base font-bold text-white sm:col-span-1"><Icon name="box" className="size-5" />Count stock</button></section><section className="mt-5 grid gap-3 sm:grid-cols-2">{products.map((product) => <button key={product.slug} onClick={() => navigate(`/inventory/products/${product.slug}`)} className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4 text-left shadow-card"><span className="grid size-12 place-items-center rounded-xl bg-canvas text-brand"><Icon name="box" className="size-6" /></span><span className="min-w-0 flex-1"><span className="block truncate text-base font-bold">{product.name}</span><span className="mt-1 block text-sm text-muted">{product.stock} in stock · {product.price}</span></span><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${product.stock <= product.reorder ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{product.stock <= product.reorder ? "Low" : "Good"}</span></button>)}</section></>}
 
       {section === "reports" && <section className="mt-5 grid gap-4 sm:grid-cols-2">{[["Sales report","See how much the store sold","chart","/reports/sales","bg-sky-50 text-sky-700"],["Cash report","See available cash and GCash","wallet","/reports/cash","bg-emerald-50 text-emerald-700"],["Product report","See top products and low stock","box","/reports/products","bg-amber-50 text-amber-700"],["Financial statements","See profit, position, and cash flow","ledger","/reports/statements","bg-violet-50 text-violet-700"]].map(([label,note,icon,path,tone]) => <button key={label} onClick={() => navigate(path)} className="flex min-h-32 items-center gap-4 rounded-2xl border border-line bg-white p-5 text-left shadow-card transition hover:border-brand/30"><span className={`grid size-14 shrink-0 place-items-center rounded-2xl ${tone}`}><Icon name={icon as IconName} className="size-7" /></span><span className="flex-1"><span className="block text-lg font-bold">{label}</span><span className="mt-1 block text-sm leading-relaxed text-muted">{note}</span></span><Icon name="chevron" className="size-5 text-muted" /></button>)}</section>}
 
@@ -528,7 +542,69 @@ function BasicPageGuide({ pathname, navigate }: { pathname: string; navigate: (p
   );
 }
 
-function WorkspacePage({ pathname, search, navigate, notify, activityLog, periods, selectedPeriod, onSelectPeriod, onUpdatePeriodCheck, businessProfile, onSaveBusiness, onSignOut, basicMode }: { pathname: string; search: string; navigate: (path: string) => void; notify: (message: string) => void; activityLog: ActivityRecord[]; periods: AccountingPeriod[]; selectedPeriod: AccountingPeriod; onSelectPeriod: (id: string) => void; onUpdatePeriodCheck: (index: number, complete: boolean) => void; businessProfile: BusinessProfile; onSaveBusiness: (profile: BusinessProfile) => void; onSignOut: () => void; basicMode: boolean }) {
+function WorkspacePage({
+  pathname,
+  search,
+  navigate,
+  notify,
+  activityLog,
+  periods,
+  selectedPeriod,
+  onSelectPeriod,
+  onUpdatePeriodCheck,
+  businessProfile,
+  onSaveBusiness,
+  onSignOut,
+  basicMode,
+  products,
+  categories,
+  debts,
+  pendingPayments,
+  supplierOrders,
+  receipts,
+  storeTransactions,
+  onOpenPos,
+  onOpenAddProduct,
+  onEditProduct,
+  onViewReceipt,
+  onAddDebt,
+  onRecordDebtPayment,
+  onAddPendingPayment,
+  onSettlePayment,
+  onCreateSupplierOrder,
+  onMarkSupplierOrderReceived,
+}: {
+  pathname: string;
+  search: string;
+  navigate: (path: string) => void;
+  notify: (message: string) => void;
+  activityLog: ActivityRecord[];
+  periods: AccountingPeriod[];
+  selectedPeriod: AccountingPeriod;
+  onSelectPeriod: (id: string) => void;
+  onUpdatePeriodCheck: (index: number, complete: boolean) => void;
+  businessProfile: BusinessProfile;
+  onSaveBusiness: (profile: BusinessProfile) => void;
+  onSignOut: () => void;
+  basicMode: boolean;
+  products: Product[];
+  categories: string[];
+  debts: CustomerDebt[];
+  pendingPayments: PendingPayment[];
+  supplierOrders: SupplierOrder[];
+  receipts: Receipt[];
+  storeTransactions: TransactionRecord[];
+  onOpenPos: () => void;
+  onOpenAddProduct: () => void;
+  onEditProduct: (product: Product) => void;
+  onViewReceipt: (receipt: Receipt) => void;
+  onAddDebt: (debt: CustomerDebt) => void;
+  onRecordDebtPayment: (debtId: string, amount: number, paymentMethod: string) => void;
+  onAddPendingPayment: (payment: PendingPayment) => void;
+  onSettlePayment: (paymentId: string, source: string) => void;
+  onCreateSupplierOrder: (order: SupplierOrder) => void;
+  onMarkSupplierOrderReceived: (orderId: string) => void;
+}) {
   const isNewEntry = pathname === "/journal/new";
   const entryDetail = pathname.match(/^\/journal\/(JE-\d+)$/i)?.[1]?.toUpperCase();
   const memberSlug = pathname.match(/^\/team\/([^/]+)$/)?.[1];
@@ -536,7 +612,7 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
   const activityId = pathname.match(/^\/history\/([^/]+)$/)?.[1];
   const activityRecord = activityLog.find((record) => record.id === activityId);
   const productSlug = pathname.match(/^\/inventory\/products\/([^/]+)$/)?.[1];
-  const selectedProduct = productCatalog.find((product) => product.slug === productSlug);
+  const selectedProduct = products.find((product) => product.slug === productSlug);
   const compareReport = pathname.match(/^\/reports\/(cash|sales)\/compare$/)?.[1];
   const workflowMeta = pathname === "/inventory/count/new"
     ? { eyebrow: "Inventory control", title: "Start stock count", description: "Create a physical count session and reconcile it with recorded inventory." }
@@ -562,6 +638,8 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
   const [businessDraft, setBusinessDraft] = useState<BusinessProfile>(businessProfile);
   const [ledgerAccount, setLedgerAccount] = useState("Cash on hand");
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [inventoryCategory, setInventoryCategory] = useState("All categories");
   const [settingToggles, setSettingToggles] = useState<Record<string, boolean>>({
     autoPostSales: true,
     stockAccounting: true,
@@ -577,7 +655,7 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
   const periodProgress = Math.round((selectedPeriod.checks.filter(Boolean).length / selectedPeriod.checks.length) * 100);
   const statementsReady = selectedPeriod.checks[4];
   const productSuggestions = globalSearchQuery.trim()
-    ? productCatalog
+    ? products
       .filter((product) => product.name.toLowerCase().startsWith(globalSearchQuery.trim().toLowerCase()))
       .slice(0, 6)
     : [];
@@ -648,12 +726,20 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
   const currentLedger = ledgerAccounts[ledgerAccount];
   const inventoryDirectory = ["/inventory", "/inventory/products", "/inventory/stocks"].includes(pathname);
   const inventoryView = pathname === "/inventory/stocks" ? "stocks" : "products";
-  const lowStockProducts = productCatalog.filter((product) => product.stock <= product.reorder);
-  const totalStockUnits = productCatalog.reduce((total, product) => total + product.stock, 0);
+  const lowStockProducts = products.filter((product) => product.stock <= product.reorder);
+  const totalStockUnits = products.reduce((total, product) => total + product.stock, 0);
+  const displayedProducts = products.filter((product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+      product.sku.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+      product.category.toLowerCase().includes(inventorySearch.toLowerCase());
+    const matchesCat = inventoryCategory === "All categories" || product.category === inventoryCategory;
+    return matchesSearch && matchesCat;
+  });
   const basicSectionRoute = ["/journal", "/inventory", "/inventory/products", "/inventory/stocks", "/reports", "/team", "/history"].includes(pathname);
 
   if (basicMode && basicSectionRoute) {
-    return <BasicSectionPage pathname={pathname} navigate={navigate} activityLog={activityLog} />;
+    return <BasicSectionPage pathname={pathname} navigate={navigate} activityLog={activityLog} products={products} transactions={storeTransactions} />;
   }
 
   return (
@@ -665,7 +751,26 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand">{meta.eyebrow}</p><h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{meta.title}</h1><p className="mt-1 max-w-2xl text-sm text-muted">{meta.description}</p></div>
         {pathname === "/journal" && <button onClick={() => navigate("/journal/new?type=journal-entry")} className="flex items-center gap-2 rounded-xl bg-brand px-4 py-3 text-xs font-bold text-white"><Icon name="plus" className="size-4" />New journal entry</button>}
-        {inventoryDirectory && <button onClick={() => navigate("/inventory/count/new")} className="flex items-center gap-2 rounded-xl bg-brand px-4 py-3 text-xs font-bold text-white"><Icon name="box" className="size-4" />Start stock count</button>}
+        {inventoryDirectory && (
+          <div className="flex items-center gap-2">
+            <button onClick={onOpenAddProduct} className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-dark">
+              <Icon name="plus" className="size-4" />Add product
+            </button>
+            <button onClick={() => navigate("/inventory/count/new")} className="flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-xs font-bold text-ink shadow-sm transition hover:bg-canvas">
+              <Icon name="box" className="size-4" />Start stock count
+            </button>
+          </div>
+        )}
+        {pathname === "/pos" && (
+          <button onClick={onOpenPos} className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-dark">
+            <Icon name="cash" className="size-4" />Launch POS Register
+          </button>
+        )}
+        {pathname === "/receipts" && (
+          <button onClick={onOpenPos} className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand-dark">
+            <Icon name="cash" className="size-4" />Record sale / POS
+          </button>
+        )}
         {pathname === "/history" && <AnimatedActionButton onConfirm={() => complete("System history exported")} workingLabel="Preparing..." successLabel="Exported" className="rounded-xl border border-line bg-white px-4 py-3 text-xs font-bold text-ink"><span className="flex items-center gap-2"><Icon name="receipt" className="size-4" />Export history</span></AnimatedActionButton>}
       </div>
 
@@ -701,7 +806,7 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
           ) : (
             <>
               <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row"><input maxLength={80} className="h-10 flex-1 rounded-xl bg-canvas px-4 text-xs outline-none" placeholder="Search entries..." /><select className="h-10 rounded-xl border border-line px-3 text-xs font-semibold"><option>All statuses</option><option>Posted</option><option>For review</option></select></div>
-              {transactions.map((item) => <button key={item.ref} onClick={() => navigate(`/journal/${item.ref}`)} className="flex w-full items-center gap-3 border-b border-line p-4 text-left last:border-0 hover:bg-canvas"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-brand"><Icon name={item.icon} className="size-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold">{item.title}</span><span className="block text-xs text-muted">{item.ref} · {item.detail}</span></span><span className="text-right"><span className="block text-sm font-bold">{item.amount}</span><span className="text-[10px] text-muted">{item.status}</span></span><Icon name="chevron" className="size-4 text-muted" /></button>)}
+              {storeTransactions.map((item) => <button key={item.ref} onClick={() => navigate(`/journal/${item.ref}`)} className="flex w-full items-center gap-3 border-b border-line p-4 text-left last:border-0 hover:bg-canvas"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-brand"><Icon name={item.icon as IconName} className="size-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold">{item.title}</span><span className="block text-xs text-muted">{item.ref} · {item.detail}</span></span><span className="text-right"><span className="block text-sm font-bold">{item.amount}</span><span className="text-[10px] text-muted">{item.status}</span></span><Icon name="chevron" className="size-4 text-muted" /></button>)}
             </>
           )}
         </section>
@@ -736,11 +841,162 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
 
       {inventoryDirectory && (
         <div className="mt-6 space-y-5">
-          <nav className="flex w-fit rounded-xl border border-line bg-white p-1 shadow-card"><button onClick={() => navigate("/inventory/products")} className={`rounded-lg px-4 py-2.5 text-xs font-bold ${inventoryView === "products" ? "bg-brand text-white" : "text-muted"}`}>Products</button><button onClick={() => navigate("/inventory/stocks")} className={`rounded-lg px-4 py-2.5 text-xs font-bold ${inventoryView === "stocks" ? "bg-brand text-white" : "text-muted"}`}>Stock levels</button></nav>
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-2xl border border-line bg-white p-4 shadow-card"><p className="text-[10px] font-bold uppercase text-muted">Products</p><p className="mt-2 text-xl font-bold">{productCatalog.length}</p></div><div className="rounded-2xl border border-line bg-white p-4 shadow-card"><p className="text-[10px] font-bold uppercase text-muted">Units on hand</p><p className="mt-2 text-xl font-bold">{totalStockUnits}</p></div><div className="rounded-2xl border border-line bg-white p-4 shadow-card"><p className="text-[10px] font-bold uppercase text-muted">Low stock</p><p className="mt-2 text-xl font-bold text-amber-700">{lowStockProducts.length}</p></div><button onClick={() => navigate("/reports/products")} className="rounded-2xl bg-sidebar p-4 text-left text-white shadow-card"><p className="text-[10px] font-bold uppercase text-white/45">Product report</p><p className="mt-2 flex items-center gap-2 text-sm font-bold">View performance <Icon name="arrow" className="size-3.5" /></p></button></section>
+          <nav className="flex w-fit rounded-xl border border-line bg-white p-1 shadow-card">
+            <button onClick={() => navigate("/inventory/products")} className={`rounded-lg px-4 py-2.5 text-xs font-bold ${inventoryView === "products" ? "bg-brand text-white" : "text-muted"}`}>Products</button>
+            <button onClick={() => navigate("/inventory/stocks")} className={`rounded-lg px-4 py-2.5 text-xs font-bold ${inventoryView === "stocks" ? "bg-brand text-white" : "text-muted"}`}>Stock levels</button>
+          </nav>
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-card">
+              <p className="text-[10px] font-bold uppercase text-muted">Products</p>
+              <p className="mt-2 text-xl font-bold">{products.length}</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-card">
+              <p className="text-[10px] font-bold uppercase text-muted">Units on hand</p>
+              <p className="mt-2 text-xl font-bold">{totalStockUnits}</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-card">
+              <p className="text-[10px] font-bold uppercase text-muted">Low stock</p>
+              <p className="mt-2 text-xl font-bold text-amber-700">{lowStockProducts.length}</p>
+            </div>
+            <button onClick={() => navigate("/reports/products")} className="rounded-2xl bg-sidebar p-4 text-left text-white shadow-card">
+              <p className="text-[10px] font-bold uppercase text-white/45">Product report</p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-bold">View performance <Icon name="arrow" className="size-3.5" /></p>
+            </button>
+          </section>
           <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
-            <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row"><div className="flex h-10 flex-1 items-center gap-2 rounded-xl bg-canvas px-3"><Icon name="search" className="size-4 text-muted" /><input maxLength={80} className="min-w-0 flex-1 bg-transparent text-xs outline-none" placeholder="Search all products or SKU..." /></div><select className="h-10 rounded-xl border border-line px-3 text-xs font-semibold"><option>All categories</option><option>Beverages</option><option>Snacks</option><option>Dry goods</option><option>Household</option></select></div>
-            {inventoryView === "products" ? <div className="divide-y divide-line">{productCatalog.map((product) => <button key={product.slug} onClick={() => navigate(`/inventory/products/${product.slug}`)} className="grid w-full grid-cols-[1fr_80px] items-center gap-3 p-4 text-left transition hover:bg-canvas sm:grid-cols-[1fr_120px_100px_100px] sm:px-5"><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-brand"><Icon name="box" className="size-5" /></span><span className="min-w-0"><span className="block truncate text-sm font-bold">{product.name}</span><span className="mt-0.5 block text-[10px] text-muted">{product.sku} · {product.category}</span></span></div><span className="hidden text-xs text-muted sm:block">{product.price}</span><span className="hidden text-center text-xs font-bold sm:block">{product.stock} units</span><span className="flex items-center justify-end gap-2"><span className={`rounded-full px-2 py-1 text-[9px] font-bold ${product.stock <= product.reorder ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{product.stock <= product.reorder ? "Low" : "Healthy"}</span><Icon name="chevron" className="size-4 text-muted" /></span></button>)}</div> : <div className="divide-y divide-line">{productCatalog.map((product) => { const percent = Math.min(100, Math.round((product.stock / Math.max(product.reorder * 2, 1)) * 100)); return <div key={product.slug} className="grid grid-cols-[1fr_70px_80px] items-center gap-3 p-4 sm:grid-cols-[1fr_90px_90px_150px_70px] sm:px-5"><button onClick={() => navigate(`/inventory/products/${product.slug}`)} className="min-w-0 text-left"><span className="block truncate text-sm font-bold">{product.name}</span><span className="mt-0.5 block text-[10px] text-muted">{product.sku}</span></button><span className={`text-center text-sm font-bold ${product.stock <= product.reorder ? "text-amber-700" : ""}`}>{product.stock}</span><span className="text-center text-xs text-muted">{product.reorder}</span><span className="hidden sm:block"><span className="block h-1.5 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full ${product.stock <= product.reorder ? "bg-amber-400" : "bg-brand"}`} style={{ width: `${percent}%` }} /></span><span className="mt-1 block text-right text-[9px] text-muted">{product.stock <= product.reorder ? "Reorder needed" : "Stock healthy"}</span></span><button onClick={() => navigate("/inventory/count/new")} className="text-[10px] font-bold text-brand">Count</button></div>; })}</div>}
+            <div className="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center">
+              <div className="flex h-10 flex-1 items-center gap-2 rounded-xl bg-canvas px-3 focus-within:border-brand">
+                <Icon name="search" className="size-4 text-muted" />
+                <input
+                  value={inventorySearch}
+                  onChange={(e) => setInventorySearch(e.target.value)}
+                  maxLength={80}
+                  className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+                  placeholder="Search products by name, SKU, or category..."
+                />
+                {inventorySearch && (
+                  <button onClick={() => setInventorySearch("")} className="text-xs text-muted hover:text-ink">✕</button>
+                )}
+              </div>
+              <select
+                value={inventoryCategory}
+                onChange={(e) => setInventoryCategory(e.target.value)}
+                className="h-10 rounded-xl border border-line bg-white px-3 text-xs font-semibold outline-none"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <button
+                onClick={onOpenAddProduct}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-dark"
+              >
+                <Icon name="plus" className="size-3.5" />
+                Add Product
+              </button>
+            </div>
+
+            {displayedProducts.length === 0 ? (
+              <div className="p-12 text-center text-muted">
+                <Icon name="box" className="mx-auto size-8 text-slate-300" />
+                <p className="mt-2 text-sm font-bold text-ink">No matching products</p>
+                <p className="mt-1 text-xs">Try selecting a different category or clearing the search.</p>
+                <button
+                  onClick={() => { setInventorySearch(""); setInventoryCategory("All categories"); }}
+                  className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-bold text-brand"
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : inventoryView === "products" ? (
+              <div className="divide-y divide-line">
+                {displayedProducts.map((product) => (
+                  <div
+                    key={product.slug}
+                    className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between transition hover:bg-canvas/50"
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-brand">
+                        <Icon name="box" className="size-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <button
+                          onClick={() => navigate(`/inventory/products/${product.slug}`)}
+                          className="block truncate text-sm font-bold text-ink hover:text-brand transition text-left"
+                        >
+                          {product.name}
+                        </button>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
+                          <span className="font-mono">{product.sku}</span>
+                          <span>·</span>
+                          <span className="rounded bg-canvas px-1.5 py-0.5 font-bold text-ink text-[10px]">
+                            {product.category}
+                          </span>
+                          <span>·</span>
+                          <span>{product.stock} in stock</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 border-t border-line/60 pt-2 sm:border-0 sm:pt-0">
+                      <div className="text-right">
+                        <p className="text-sm font-extrabold text-ink">{product.price}</p>
+                        {product.costPrice && (
+                          <p className="text-[10px] text-muted">Cost: {product.costPrice}</p>
+                        )}
+                      </div>
+
+                      <span className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${
+                        product.stock <= product.reorder ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                      }`}>
+                        {product.stock <= product.reorder ? "Low stock" : "Healthy"}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onEditProduct(product)}
+                          className="rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-bold text-ink shadow-2xs hover:border-brand/40 hover:text-brand transition"
+                        >
+                          Edit Price
+                        </button>
+                        <button
+                          onClick={() => navigate(`/inventory/products/${product.slug}`)}
+                          className="rounded-xl p-1.5 text-muted hover:bg-canvas hover:text-ink"
+                        >
+                          <Icon name="chevron" className="size-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="divide-y divide-line">
+                {displayedProducts.map((product) => {
+                  const percent = Math.min(100, Math.round((product.stock / Math.max(product.reorder * 2, 1)) * 100));
+                  return (
+                    <div key={product.slug} className="grid grid-cols-[1fr_70px_80px] items-center gap-3 p-4 sm:grid-cols-[1fr_90px_90px_150px_auto] sm:px-5">
+                      <button onClick={() => navigate(`/inventory/products/${product.slug}`)} className="min-w-0 text-left">
+                        <span className="block truncate text-sm font-bold hover:text-brand">{product.name}</span>
+                        <span className="mt-0.5 block text-[10px] text-muted">{product.sku} · {product.price}</span>
+                      </button>
+                      <span className={`text-center text-sm font-bold ${product.stock <= product.reorder ? "text-amber-700" : ""}`}>{product.stock}</span>
+                      <span className="text-center text-xs text-muted">{product.reorder}</span>
+                      <span className="hidden sm:block">
+                        <span className="block h-1.5 overflow-hidden rounded-full bg-slate-100">
+                          <span className={`block h-full rounded-full ${product.stock <= product.reorder ? "bg-amber-400" : "bg-brand"}`} style={{ width: `${percent}%` }} />
+                        </span>
+                        <span className="mt-1 block text-right text-[9px] text-muted">{product.stock <= product.reorder ? "Reorder needed" : "Stock healthy"}</span>
+                      </span>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => onEditProduct(product)} className="rounded-lg border border-line px-2.5 py-1 text-[11px] font-bold text-ink hover:text-brand">Edit Price</button>
+                        <button onClick={() => navigate("/inventory/count/new")} className="text-[10px] font-bold text-brand">Count</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -749,18 +1005,225 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
         <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="space-y-5">
             <section className="rounded-2xl border border-line bg-white p-5 shadow-card sm:p-7">
-              <div className="flex items-start gap-4"><span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-brand"><Icon name="box" className="size-7" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold">{selectedProduct.name}</h2><span className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${selectedProduct.stock <= selectedProduct.reorder ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{selectedProduct.stock <= selectedProduct.reorder ? "Low stock" : "In stock"}</span></div><p className="mt-1 text-xs text-muted">{selectedProduct.sku} · {selectedProduct.category}</p></div><button onClick={() => navigate("/inventory/count/new")} className="rounded-xl border border-line px-3 py-2 text-xs font-bold">Count stock</button></div>
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">{[["On hand",`${selectedProduct.stock} units`],["Reorder point",`${selectedProduct.reorder} units`],["Selling price",selectedProduct.price],["Inventory value",`₱${(selectedProduct.stock * Number(selectedProduct.price.replace(/[₱,]/g, ""))).toLocaleString()}`]].map(([label,value]) => <div key={label} className="rounded-xl bg-canvas p-3"><p className="text-[10px] text-muted">{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div>)}</div>
+              <div className="flex items-start gap-4">
+                <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-brand"><Icon name="box" className="size-7" /></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-bold">{selectedProduct.name}</h2>
+                    <span className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${selectedProduct.stock <= selectedProduct.reorder ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{selectedProduct.stock <= selectedProduct.reorder ? "Low stock" : "In stock"}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{selectedProduct.sku} · {selectedProduct.category}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => onEditProduct(selectedProduct)} className="rounded-xl bg-brand px-3.5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-brand-dark">Edit Price & Info</button>
+                  <button onClick={() => navigate("/inventory/count/new")} className="rounded-xl border border-line px-3 py-2 text-xs font-bold">Count stock</button>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  ["On hand", `${selectedProduct.stock} units`],
+                  ["Reorder point", `${selectedProduct.reorder} units`],
+                  ["Selling price", selectedProduct.price],
+                  ["Cost price", selectedProduct.costPrice || "—"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-canvas p-3">
+                    <p className="text-[10px] text-muted">{label}</p>
+                    <p className="mt-1 text-sm font-bold">{value}</p>
+                  </div>
+                ))}
+              </div>
             </section>
-            <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card"><div className="flex items-center justify-between border-b border-line p-5"><div><h2 className="text-sm font-bold">Recent stock activity</h2><p className="mt-1 text-xs text-muted">Purchases, sales, counts, and adjustments</p></div><button onClick={() => navigate("/history")} className="text-xs font-bold text-brand">View history</button></div>{[["Sale","−2 units","Today, 10:32 AM"],["Physical count","48 units confirmed","Yesterday, 5:48 PM"],["Supplier delivery","+24 units","Nov 15, 9:20 AM"]].map(([event,quantity,time]) => <div key={`${event}-${time}`} className="grid grid-cols-[1fr_100px_120px] border-b border-line p-4 text-xs last:border-0"><span className="font-bold">{event}</span><span className="text-right font-semibold">{quantity}</span><span className="text-right text-muted">{time}</span></div>)}</section>
+            <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+              <div className="flex items-center justify-between border-b border-line p-5">
+                <div><h2 className="text-sm font-bold">Recent stock activity</h2><p className="mt-1 text-xs text-muted">Purchases, sales, counts, and adjustments</p></div>
+                <button onClick={() => navigate("/history")} className="text-xs font-bold text-brand">View history</button>
+              </div>
+              {[["Sale", "−2 units", "Today, 10:32 AM"], ["Physical count", "48 units confirmed", "Yesterday, 5:48 PM"], ["Supplier delivery", "+24 units", "Nov 15, 9:20 AM"]].map(([event, quantity, time]) => (
+                <div key={`${event}-${time}`} className="grid grid-cols-[1fr_100px_120px] border-b border-line p-4 text-xs last:border-0">
+                  <span className="font-bold">{event}</span>
+                  <span className="text-right font-semibold">{quantity}</span>
+                  <span className="text-right text-muted">{time}</span>
+                </div>
+              ))}
+            </section>
           </div>
-          <aside className="space-y-5"><section className="rounded-2xl bg-sidebar p-5 text-white"><p className="text-[10px] font-bold uppercase tracking-wider text-white/45">Stock health</p><p className="mt-2 text-lg font-bold">{selectedProduct.stock <= selectedProduct.reorder ? "Reorder recommended" : "Healthy stock level"}</p><p className="mt-2 text-xs leading-relaxed text-white/55">{selectedProduct.stock <= selectedProduct.reorder ? `Current stock is below the ${selectedProduct.reorder}-unit reorder point.` : `${selectedProduct.stock - selectedProduct.reorder} units available above the reorder point.`}</p><button onClick={() => navigate("/inventory/count/new")} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-xs font-bold text-sidebar">Start stock count <Icon name="arrow" className="size-3.5" /></button></section><section className="rounded-2xl border border-line bg-white p-5 shadow-card"><h2 className="text-sm font-bold">Supplier</h2><p className="mt-3 text-xs font-bold">Davao Wholesale Trading</p><p className="mt-1 text-[10px] text-muted">Last delivery · Nov 15, 2025</p><AnimatedActionButton onConfirm={() => complete(`Purchase order started for ${selectedProduct.name}`)} workingLabel="Creating..." successLabel="PO started" className="mt-4 w-full rounded-xl border border-line py-2.5 text-xs font-bold">Create purchase order</AnimatedActionButton></section></aside>
+          <aside className="space-y-5">
+            <section className="rounded-2xl bg-sidebar p-5 text-white">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/45">Stock health</p>
+              <p className="mt-2 text-lg font-bold">{selectedProduct.stock <= selectedProduct.reorder ? "Reorder recommended" : "Healthy stock level"}</p>
+              <p className="mt-2 text-xs leading-relaxed text-white/55">{selectedProduct.stock <= selectedProduct.reorder ? `Current stock is below the ${selectedProduct.reorder}-unit reorder point.` : `${selectedProduct.stock - selectedProduct.reorder} units available above the reorder point.`}</p>
+              <button onClick={() => onEditProduct(selectedProduct)} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3 text-xs font-bold text-sidebar">Update Product Price <Icon name="arrow" className="size-3.5" /></button>
+            </section>
+            <section className="rounded-2xl border border-line bg-white p-5 shadow-card">
+              <h2 className="text-sm font-bold">Supplier Ordering</h2>
+              <p className="mt-3 text-xs font-bold">Davao Wholesale Trading</p>
+              <p className="mt-1 text-[10px] text-muted">Direct wholesale procurement</p>
+              <button onClick={() => navigate("/supplier-orders")} className="mt-4 w-full rounded-xl border border-line py-2.5 text-xs font-bold hover:border-brand/30 hover:text-brand transition">
+                Create purchase order
+              </button>
+            </section>
+          </aside>
+        </div>
+      )}
+
+      {pathname === "/pos" && (
+        <div className="mt-6 space-y-6">
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-card">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Receipts Issued</p>
+              <p className="mt-2 text-2xl font-bold text-ink">{receipts.length}</p>
+              <p className="mt-1 text-[11px] text-muted">Sales slips recorded</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-card">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Total Sales Volume</p>
+              <p className="mt-2 text-2xl font-extrabold text-emerald-700">
+                ₱{receipts.reduce((sum, r) => sum + r.total, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+              <p className="mt-1 text-[11px] text-muted">Gross recorded sales</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-card">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Pending Customer Debts</p>
+              <p className="mt-2 text-2xl font-bold text-amber-700">
+                ₱{debts.filter((d) => d.status !== "Settled").reduce((sum, d) => sum + (d.amount - d.paidAmount), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+              <p className="mt-1 text-[11px] text-muted">{debts.filter((d) => d.status !== "Settled").length} customers with utang</p>
+            </div>
+            <div className="rounded-2xl bg-sidebar p-4 text-white shadow-card">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-white/45">Quick POS Actions</p>
+              <button
+                onClick={onOpenPos}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-2 text-xs font-bold text-white shadow transition hover:bg-brand-dark"
+              >
+                <Icon name="cash" className="size-4" />
+                Launch POS Register
+              </button>
+            </div>
+          </section>
+
+          <div className="relative overflow-hidden rounded-2xl border border-brand/20 bg-sidebar p-6 text-white shadow-xl">
+            <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                  Corner Market POS Terminal
+                </span>
+                <h2 className="mt-2 text-xl font-bold">Ring up customer sales & print receipts</h2>
+                <p className="mt-1 max-w-xl text-xs text-white/70 leading-relaxed">
+                  Support Cash, GCash, and Store Credit / Utang payments. Calculates change, updates inventory, and posts sales directly to the journal.
+                </p>
+              </div>
+              <button
+                onClick={onOpenPos}
+                className="flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 text-xs font-extrabold text-white shadow-lg transition hover:bg-brand-dark shrink-0"
+              >
+                <Icon name="cash" className="size-4.5" />
+                Open POS Register Now
+              </button>
+            </div>
+          </div>
+
+          <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card">
+            <div className="flex items-center justify-between border-b border-line p-5">
+              <div>
+                <h3 className="text-base font-bold text-ink">Recent Sales Transactions</h3>
+                <p className="text-xs text-muted">Itemized customer sales, payment method, and receipts</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate("/receipts")}
+                  className="flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+                >
+                  All receipts <Icon name="arrow" className="size-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="divide-y divide-line">
+              {receipts.length === 0 ? (
+                <div className="p-12 text-center text-muted">
+                  <p className="text-sm font-bold">No sales records yet</p>
+                  <p className="mt-1 text-xs">Click "Launch POS Register" to record your first sale.</p>
+                </div>
+              ) : (
+                receipts.slice(0, 10).map((receipt) => (
+                  <div key={receipt.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between hover:bg-canvas/50 transition">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-extrabold text-brand">{receipt.id}</span>
+                        <span className="text-xs font-bold text-ink">{receipt.customerName}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                          receipt.paymentMethod === "Cash" ? "bg-emerald-50 text-emerald-700" :
+                          receipt.paymentMethod === "GCash" ? "bg-sky-50 text-sky-700" : "bg-amber-50 text-amber-700"
+                        }`}>
+                          {receipt.paymentMethod}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600 truncate">
+                        {receipt.items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
+                        <span>{receipt.date} at {receipt.time}</span>
+                        <span>·</span>
+                        <span>Cashier: {receipt.cashier}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-extrabold text-emerald-700">₱{receipt.total.toFixed(2)}</p>
+                        {receipt.discount > 0 && <p className="text-[10px] text-muted">Disc: ₱{receipt.discount.toFixed(2)}</p>}
+                      </div>
+                      <button
+                        onClick={() => onViewReceipt(receipt)}
+                        className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-bold text-ink shadow-2xs hover:border-brand/40 hover:text-brand transition"
+                      >
+                        Receipt
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {pathname === "/debts" && (
+        <div className="mt-6">
+          <DebtsView
+            debts={debts}
+            pendingPayments={pendingPayments}
+            onAddDebt={onAddDebt}
+            onRecordDebtPayment={onRecordDebtPayment}
+            onAddPendingPayment={onAddPendingPayment}
+            onSettlePayment={onSettlePayment}
+          />
+        </div>
+      )}
+
+      {pathname === "/supplier-orders" && (
+        <div className="mt-6">
+          <SupplierOrdersView
+            orders={supplierOrders}
+            products={products}
+            onCreateOrder={onCreateSupplierOrder}
+            onMarkReceived={onMarkSupplierOrderReceived}
+          />
+        </div>
+      )}
+
+      {pathname === "/receipts" && (
+        <div className="mt-6">
+          <ReceiptsView
+            receipts={receipts}
+            onViewReceipt={onViewReceipt}
+            onOpenPos={onOpenPos}
+          />
         </div>
       )}
 
       {pathname === "/reports" && (
         <div className="mt-6 space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["cash","Cash position","₱84,250","Available across cash, bank, and GCash"],["sales","Sales summary","₱412,680","+8.4% from last month"],["products","Product performance",`${productCatalog.length} products`,"Sales, revenue, and stock health"],["statements","Financial statements",selectedPeriod.label,selectedPeriod.checks[2] ? "Trial balance is ready" : "Trial balance pending"]].map(([slug,label,value,note]) => <button key={slug} onClick={() => navigate(`/reports/${slug}`)} className="group rounded-2xl border border-line bg-white p-5 text-left shadow-card transition hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-lg"><div className="flex items-start justify-between"><Icon name={slug === "cash" ? "wallet" : slug === "sales" ? "chart" : slug === "products" ? "box" : "ledger"} className="size-6 text-brand" /><Icon name="arrow" className="size-4 text-muted transition group-hover:translate-x-1 group-hover:text-brand" /></div><p className="mt-5 text-xs font-bold uppercase tracking-wider text-muted">{label}</p><p className="mt-2 text-xl font-bold">{value}</p><p className="mt-1 text-xs text-muted">{note}</p></button>)}</div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["cash","Cash position","₱84,250","Available across cash, bank, and GCash"],["sales","Sales summary","₱412,680","+8.4% from last month"],["products","Product performance",`${products.length} products`,"Sales, revenue, and stock health"],["statements","Financial statements",selectedPeriod.label,selectedPeriod.checks[2] ? "Trial balance is ready" : "Trial balance pending"]].map(([slug,label,value,note]) => <button key={slug} onClick={() => navigate(`/reports/${slug}`)} className="group rounded-2xl border border-line bg-white p-5 text-left shadow-card transition hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-lg"><div className="flex items-start justify-between"><Icon name={slug === "cash" ? "wallet" : slug === "sales" ? "chart" : slug === "products" ? "box" : "ledger"} className="size-6 text-brand" /><Icon name="arrow" className="size-4 text-muted transition group-hover:translate-x-1 group-hover:text-brand" /></div><p className="mt-5 text-xs font-bold uppercase tracking-wider text-muted">{label}</p><p className="mt-2 text-xl font-bold">{value}</p><p className="mt-1 text-xs text-muted">{note}</p></button>)}</div>
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
             <section className="rounded-2xl border border-line bg-white p-5 shadow-card"><div className="flex items-center justify-between"><div><h2 className="text-sm font-bold">{selectedPeriod.label} performance</h2><p className="mt-1 text-xs text-muted">Key movements compared with the prior period</p></div><button onClick={() => navigate("/reports/sales")} className="text-xs font-bold text-brand">View analysis</button></div><div className="mt-5 grid grid-cols-3 gap-3"><div className="rounded-xl bg-canvas p-3"><p className="text-[10px] text-muted">Gross margin</p><p className="mt-1 text-lg font-bold">24.8%</p><p className="mt-1 text-[9px] font-bold text-emerald-700">+1.2 pts</p></div><div className="rounded-xl bg-canvas p-3"><p className="text-[10px] text-muted">Operating costs</p><p className="mt-1 text-lg font-bold">₱68.4K</p><p className="mt-1 text-[9px] font-bold text-amber-700">+3.1%</p></div><div className="rounded-xl bg-canvas p-3"><p className="text-[10px] text-muted">Net income</p><p className="mt-1 text-lg font-bold">₱33.9K</p><p className="mt-1 text-[9px] font-bold text-emerald-700">+9.6%</p></div></div></section>
             <aside className="rounded-2xl bg-sidebar p-5 text-white shadow-card"><p className="text-[10px] font-bold uppercase tracking-wider text-white/45">Close readiness</p><div className="mt-3 flex items-end justify-between"><p className="text-2xl font-bold">80%</p><p className="text-[10px] text-emerald-300">On track</p></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full w-4/5 rounded-full bg-emerald-400" /></div><p className="mt-3 text-xs leading-relaxed text-white/55">Review three adjustments before generating final statements.</p><button onClick={() => navigate("/reports/statements")} className="mt-4 flex items-center gap-2 text-xs font-bold text-white">Continue close <Icon name="arrow" className="size-3.5" /></button></aside>
@@ -770,9 +1233,9 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
 
       {pathname === "/reports/products" && (
         <div className="mt-6 space-y-5">
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Products tracked",String(productCatalog.length),"box"],["Units sold","2,384","cart"],["Product revenue","₱62,322","cash"],["Low-stock risks",String(lowStockProducts.length),"alert"]].map(([label,value,icon]) => <div key={label} className="rounded-2xl border border-line bg-white p-4 shadow-card"><span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-brand"><Icon name={icon as IconName} className="size-4" /></span><p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>)}</section>
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Products tracked",String(products.length),"box"],["Units sold","2,384","cart"],["Product revenue","₱62,322","cash"],["Low-stock risks",String(lowStockProducts.length),"alert"]].map(([label,value,icon]) => <div key={label} className="rounded-2xl border border-line bg-white p-4 shadow-card"><span className="grid size-9 place-items-center rounded-xl bg-emerald-50 text-brand"><Icon name={icon as IconName} className="size-4" /></span><p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>)}</section>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card"><div className="flex items-center justify-between border-b border-line p-5"><div><h2 className="text-sm font-bold">Product ranking</h2><p className="mt-1 text-xs text-muted">Sales and stock performance for {selectedPeriod.label}</p></div><AnimatedActionButton onConfirm={() => complete("Product performance report exported")} workingLabel="Preparing..." successLabel="Exported" className="rounded-xl border border-line px-3 py-2 text-[10px] font-bold">Export report</AnimatedActionButton></div><div className="grid grid-cols-[1fr_80px_100px_100px] bg-canvas px-5 py-3 text-[10px] font-bold uppercase text-muted"><span>Product</span><span className="text-right">Sold</span><span className="text-right">Revenue</span><span className="text-right">Stock</span></div>{[...productCatalog].sort((a,b) => b.unitsSold - a.unitsSold).map((product,index) => <button key={product.slug} onClick={() => navigate(`/inventory/products/${product.slug}`)} className="grid w-full grid-cols-[1fr_80px_100px_100px] items-center border-t border-line px-5 py-3.5 text-left text-xs transition hover:bg-canvas"><span className="min-w-0"><span className="block truncate font-bold">{index + 1}. {product.name}</span><span className="mt-0.5 block text-[9px] text-muted">{product.category}</span></span><span className="text-right font-semibold">{product.unitsSold}</span><span className="text-right font-bold">{product.revenue}</span><span className={`text-right font-bold ${product.stock <= product.reorder ? "text-amber-700" : "text-emerald-700"}`}>{product.stock}</span></button>)}</section>
+            <section className="overflow-hidden rounded-2xl border border-line bg-white shadow-card"><div className="flex items-center justify-between border-b border-line p-5"><div><h2 className="text-sm font-bold">Product ranking</h2><p className="mt-1 text-xs text-muted">Sales and stock performance for {selectedPeriod.label}</p></div><AnimatedActionButton onConfirm={() => complete("Product performance report exported")} workingLabel="Preparing..." successLabel="Exported" className="rounded-xl border border-line px-3 py-2 text-[10px] font-bold">Export report</AnimatedActionButton></div><div className="grid grid-cols-[1fr_80px_100px_100px] bg-canvas px-5 py-3 text-[10px] font-bold uppercase text-muted"><span>Product</span><span className="text-right">Sold</span><span className="text-right">Revenue</span><span className="text-right">Stock</span></div>{[...products].sort((a,b) => b.unitsSold - a.unitsSold).map((product,index) => <button key={product.slug} onClick={() => navigate(`/inventory/products/${product.slug}`)} className="grid w-full grid-cols-[1fr_80px_100px_100px] items-center border-t border-line px-5 py-3.5 text-left text-xs transition hover:bg-canvas"><span className="min-w-0"><span className="block truncate font-bold">{index + 1}. {product.name}</span><span className="mt-0.5 block text-[9px] text-muted">{product.category}</span></span><span className="text-right font-semibold">{product.unitsSold}</span><span className="text-right font-bold">{product.revenue}</span><span className={`text-right font-bold ${product.stock <= product.reorder ? "text-amber-700" : "text-emerald-700"}`}>{product.stock}</span></button>)}</section>
             <aside className="space-y-5"><section className="rounded-2xl border border-line bg-white p-5 shadow-card"><h2 className="text-sm font-bold">Revenue by category</h2><div className="mt-5 space-y-4">{[["Beverages","50%"],["Dry goods","16%"],["Snacks","19%"],["Canned goods","11%"],["Household","4%"]].map(([category,share]) => <div key={category}><div className="mb-1.5 flex justify-between text-xs"><span className="font-semibold">{category}</span><span className="text-muted">{share}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand" style={{ width: share }} /></div></div>)}</div></section><section className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><Icon name="alert" className="size-5 text-amber-700" /><h2 className="mt-3 text-sm font-bold text-amber-950">{lowStockProducts.length} products need stock</h2><p className="mt-1 text-xs leading-relaxed text-amber-800">Coca-Cola, canned sardines, chocolate biscuits, and powdered milk are below reorder points.</p><button onClick={() => navigate("/inventory/stocks?filter=low")} className="mt-4 flex items-center gap-1.5 text-xs font-bold text-amber-900">Review stock levels <Icon name="arrow" className="size-3.5" /></button></section></aside>
           </div>
         </div>
@@ -844,7 +1307,7 @@ function WorkspacePage({ pathname, search, navigate, notify, activityLog, period
       {pathname === "/inventory/count/new" && (
         <form noValidate id="stock-count-form" onSubmit={(event) => event.preventDefault()} className="mt-6 rounded-2xl border border-line bg-white p-5 shadow-card sm:p-7">
           <div className="grid gap-4 sm:grid-cols-3"><label className="block"><span className="mb-2 block text-xs font-bold">Store location</span><select className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm"><option>{businessProfile.name} · Main</option></select></label><label className="block"><span className="mb-2 block text-xs font-bold">Count date</span><input required type="date" defaultValue="2025-11-18" data-validation-message="Choose the date of this stock count." className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm" /></label><label className="block"><span className="mb-2 block text-xs font-bold">Assigned to</span><select className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm"><option>Miguel Santos</option><option>Ana Reyes</option><option>Liza Cruz</option></select></label></div>
-          <div className="mt-6 overflow-hidden rounded-xl border border-line"><div className="grid grid-cols-[1fr_80px_90px] bg-canvas p-3 text-[10px] font-bold uppercase text-muted"><span>Product</span><span className="text-center">Recorded</span><span className="text-center">Counted</span></div>{productCatalog.map((product) => <div key={product.slug} className="grid grid-cols-[1fr_80px_90px] items-center border-t border-line p-3"><div><p className="text-xs font-bold">{product.name}</p><p className="mt-0.5 text-[9px] text-muted">{product.sku}</p></div><p className="text-center text-xs text-muted">{product.stock}</p><input required min="0" max="9999" data-validation-message={`Enter the physical count for ${product.name}.`} type="number" className="h-9 w-full rounded-lg border border-line bg-canvas px-2 text-center text-xs font-bold" placeholder="0" /></div>)}</div>
+          <div className="mt-6 overflow-hidden rounded-xl border border-line"><div className="grid grid-cols-[1fr_80px_90px] bg-canvas p-3 text-[10px] font-bold uppercase text-muted"><span>Product</span><span className="text-center">Recorded</span><span className="text-center">Counted</span></div>{products.map((product) => <div key={product.slug} className="grid grid-cols-[1fr_80px_90px] items-center border-t border-line p-3"><div><p className="text-xs font-bold">{product.name}</p><p className="mt-0.5 text-[9px] text-muted">{product.sku}</p></div><p className="text-center text-xs text-muted">{product.stock}</p><input required min="0" max="9999" data-validation-message={`Enter the physical count for ${product.name}.`} type="number" className="h-9 w-full rounded-lg border border-line bg-canvas px-2 text-center text-xs font-bold" placeholder="0" /></div>)}</div>
           <label className="mt-5 block"><span className="mb-2 flex justify-between text-xs font-bold"><span>Count note</span><span className="font-medium text-muted">Required · max 240</span></span><textarea required maxLength={240} data-validation-message="Add a note describing this physical count." onInput={validateMeaningfulText} className="min-h-24 w-full rounded-xl border border-line p-3 text-sm" placeholder="Describe the count conditions or discrepancies..." /></label>
           <FormError message={formErrors["stock-count-form"]} /><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => navigate("/inventory")} className="rounded-xl border border-line px-5 py-3 text-xs font-bold">Cancel</button><AnimatedActionButton formId="stock-count-form" onValidationError={(message) => setFormError("stock-count-form", message)} onConfirm={() => complete("Physical stock count recorded", "/inventory")} workingLabel="Saving count..." successLabel="Count recorded" className="rounded-xl bg-brand px-5 py-3 text-xs font-bold text-white">Complete stock count</AnimatedActionButton></div>
         </form>
@@ -1193,8 +1656,320 @@ export default function App() {
   const [selectedPeriodId, setSelectedPeriodId] = useState(() => window.localStorage.getItem("sariledger-selected-period") ?? "2025-11");
   const selectedPeriod = periods.find((period) => period.id === selectedPeriodId) ?? periods[0];
   const selectedPeriodProgress = Math.round((selectedPeriod.checks.filter(Boolean).length / selectedPeriod.checks.length) * 100);
-  const lowStockProducts = productCatalog.filter((product) => product.stock <= product.reorder);
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-products");
+      return saved ? (JSON.parse(saved) as Product[]) : INITIAL_PRODUCTS;
+    } catch {
+      return INITIAL_PRODUCTS;
+    }
+  });
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-categories");
+      return saved ? (JSON.parse(saved) as string[]) : DEFAULT_CATEGORIES;
+    } catch {
+      return DEFAULT_CATEGORIES;
+    }
+  });
+
+  const [debts, setDebts] = useState<CustomerDebt[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-debts");
+      return saved ? (JSON.parse(saved) as CustomerDebt[]) : INITIAL_CUSTOMER_DEBTS;
+    } catch {
+      return INITIAL_CUSTOMER_DEBTS;
+    }
+  });
+
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-pending-payments");
+      return saved ? (JSON.parse(saved) as PendingPayment[]) : INITIAL_PENDING_PAYMENTS;
+    } catch {
+      return INITIAL_PENDING_PAYMENTS;
+    }
+  });
+
+  const [supplierOrders, setSupplierOrders] = useState<SupplierOrder[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-supplier-orders");
+      return saved ? (JSON.parse(saved) as SupplierOrder[]) : INITIAL_SUPPLIER_ORDERS;
+    } catch {
+      return INITIAL_SUPPLIER_ORDERS;
+    }
+  });
+
+  const [receipts, setReceipts] = useState<Receipt[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-receipts");
+      return saved ? (JSON.parse(saved) as Receipt[]) : INITIAL_RECEIPTS;
+    } catch {
+      return INITIAL_RECEIPTS;
+    }
+  });
+
+  const [storeTransactions, setStoreTransactions] = useState<TransactionRecord[]>(() => {
+    try {
+      const saved = window.localStorage.getItem("sariledger-transactions");
+      return saved ? (JSON.parse(saved) as TransactionRecord[]) : INITIAL_TRANSACTIONS;
+    } catch {
+      return INITIAL_TRANSACTIONS;
+    }
+  });
+
+  const [showPosModal, setShowPosModal] = useState(false);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedReceiptModal, setSelectedReceiptModal] = useState<Receipt | null>(null);
+
+  const lowStockProducts = products.filter((product) => product.stock <= product.reorder);
   const businessInitials = businessProfile.name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]?.toUpperCase()).join("") || "CM";
+
+  const handleSaveProduct = (updatedProduct: Product) => {
+    setProducts((current) => {
+      const exists = current.some((p) => p.slug === updatedProduct.slug);
+      const next = exists
+        ? current.map((p) => (p.slug === updatedProduct.slug ? updatedProduct : p))
+        : [updatedProduct, ...current];
+      window.localStorage.setItem("sariledger-products", JSON.stringify(next));
+      return next;
+    });
+
+    if (updatedProduct.category && !categories.includes(updatedProduct.category)) {
+      setCategories((current) => {
+        const next = [...current, updatedProduct.category];
+        window.localStorage.setItem("sariledger-categories", JSON.stringify(next));
+        return next;
+      });
+    }
+
+    showNotice(`Product "${updatedProduct.name}" saved successfully`);
+    setEditingProduct(null);
+    setShowAddProductModal(false);
+  };
+
+  const handleAddDebt = (debt: CustomerDebt) => {
+    setDebts((current) => {
+      const next = [debt, ...current];
+      window.localStorage.setItem("sariledger-debts", JSON.stringify(next));
+      return next;
+    });
+    showNotice(`Added debt record for ${debt.customerName}: ₱${debt.amount.toFixed(2)}`);
+  };
+
+  const handleRecordDebtPayment = (debtId: string, amount: number, paymentMethod: string) => {
+    let customerName = "Customer";
+    setDebts((current) => {
+      const next = current.map((d) => {
+        if (d.id !== debtId) return d;
+        customerName = d.customerName;
+        const newPaid = d.paidAmount + amount;
+        const newStatus: CustomerDebt["status"] = newPaid >= d.amount ? "Settled" : "Partially paid";
+        return { ...d, paidAmount: newPaid, status: newStatus };
+      });
+      window.localStorage.setItem("sariledger-debts", JSON.stringify(next));
+      return next;
+    });
+
+    const txRef = `JE-${1050 + storeTransactions.length}`;
+    const newTx: TransactionRecord = {
+      ref: txRef,
+      title: `Debt settlement: ${customerName}`,
+      detail: `${paymentMethod} · Customer credit payment`,
+      amount: `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      numericAmount: amount,
+      time: `Today, ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
+      kind: "sale",
+      status: "Posted",
+      icon: "wallet",
+      paymentMethod,
+    };
+    setStoreTransactions((current) => {
+      const next = [newTx, ...current];
+      window.localStorage.setItem("sariledger-transactions", JSON.stringify(next));
+      return next;
+    });
+
+    showNotice(`Recorded ₱${amount.toFixed(2)} payment from ${customerName}`);
+  };
+
+  const handleAddPendingPayment = (payment: PendingPayment) => {
+    setPendingPayments((current) => {
+      const next = [payment, ...current];
+      window.localStorage.setItem("sariledger-pending-payments", JSON.stringify(next));
+      return next;
+    });
+    showNotice(`Added pending payable: ${payment.vendorName} (₱${payment.amount.toFixed(2)})`);
+  };
+
+  const handleSettlePayment = (paymentId: string, source: string) => {
+    let vendor = "Vendor";
+    let amount = 0;
+    setPendingPayments((current) => {
+      const next = current.map((p) => {
+        if (p.id !== paymentId) return p;
+        vendor = p.vendorName;
+        amount = p.amount;
+        return { ...p, status: "Paid" as const, paidDate: new Date().toISOString().split("T")[0] };
+      });
+      window.localStorage.setItem("sariledger-pending-payments", JSON.stringify(next));
+      return next;
+    });
+
+    const txRef = `JE-${1050 + storeTransactions.length}`;
+    const newTx: TransactionRecord = {
+      ref: txRef,
+      title: `Bill settled: ${vendor}`,
+      detail: `${source} · Accounts payable payment`,
+      amount: `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      numericAmount: -amount,
+      time: `Today, ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
+      kind: "expense",
+      status: "Posted",
+      icon: "receipt",
+    };
+    setStoreTransactions((current) => {
+      const next = [newTx, ...current];
+      window.localStorage.setItem("sariledger-transactions", JSON.stringify(next));
+      return next;
+    });
+
+    showNotice(`Paid ${vendor} bill of ₱${amount.toFixed(2)} from ${source}`);
+  };
+
+  const handleCreateSupplierOrder = (order: SupplierOrder) => {
+    setSupplierOrders((current) => {
+      const next = [order, ...current];
+      window.localStorage.setItem("sariledger-supplier-orders", JSON.stringify(next));
+      return next;
+    });
+
+    const payable: PendingPayment = {
+      id: `pp-${Date.now()}`,
+      vendorName: order.supplierName,
+      invoiceRef: order.id,
+      amount: order.totalAmount,
+      dueDate: order.expectedDate,
+      status: "Unpaid",
+      category: "Inventory restock",
+      notes: `Purchase order ${order.id} (${order.items.length} items)`,
+    };
+    setPendingPayments((current) => {
+      const next = [payable, ...current];
+      window.localStorage.setItem("sariledger-pending-payments", JSON.stringify(next));
+      return next;
+    });
+
+    showNotice(`Supplier order ${order.id} placed for ${order.supplierName}`);
+  };
+
+  const handleMarkSupplierOrderReceived = (orderId: string) => {
+    let targetOrder: SupplierOrder | undefined;
+    setSupplierOrders((current) => {
+      const next = current.map((order) => {
+        if (order.id !== orderId) return order;
+        targetOrder = order;
+        return {
+          ...order,
+          status: "Received" as const,
+          receivedDate: new Date().toISOString().split("T")[0],
+        };
+      });
+      window.localStorage.setItem("sariledger-supplier-orders", JSON.stringify(next));
+      return next;
+    });
+
+    if (targetOrder) {
+      setProducts((current) => {
+        const next = current.map((prod) => {
+          const matchingItem = targetOrder?.items.find((item) => item.productSlug === prod.slug || item.productName.toLowerCase() === prod.name.toLowerCase());
+          if (matchingItem) {
+            return {
+              ...prod,
+              stock: prod.stock + matchingItem.quantity,
+            };
+          }
+          return prod;
+        });
+        window.localStorage.setItem("sariledger-products", JSON.stringify(next));
+        return next;
+      });
+
+      const txRef = `JE-${1050 + storeTransactions.length}`;
+      const newTx: TransactionRecord = {
+        ref: txRef,
+        title: `${targetOrder.supplierName} restock received`,
+        detail: `Inventory restocked · PO ${targetOrder.id}`,
+        amount: `₱${targetOrder.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        numericAmount: targetOrder.totalAmount,
+        time: `Today, ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
+        kind: "purchase",
+        status: "Posted",
+        icon: "cart",
+      };
+      setStoreTransactions((current) => {
+        const next = [newTx, ...current];
+        window.localStorage.setItem("sariledger-transactions", JSON.stringify(next));
+        return next;
+      });
+
+      showNotice(`PO ${orderId} received and restocked into inventory!`);
+    }
+  };
+
+  const handleCompleteSale = (params: {
+    receipt: Receipt;
+    transaction: TransactionRecord;
+    stockUpdates: { slug: string; quantitySold: number }[];
+    newDebt?: CustomerDebt;
+  }) => {
+    setProducts((current) => {
+      const next = current.map((prod) => {
+        const update = params.stockUpdates.find((u) => u.slug === prod.slug);
+        if (update) {
+          const newUnits = prod.unitsSold + update.quantitySold;
+          const priceNum = parseFloat(prod.price.replace(/[^0-9.]/g, "")) || 0;
+          const currentRevNum = parseFloat(prod.revenue.replace(/[^0-9.]/g, "")) || 0;
+          const newRev = currentRevNum + (priceNum * update.quantitySold);
+          return {
+            ...prod,
+            stock: Math.max(0, prod.stock - update.quantitySold),
+            unitsSold: newUnits,
+            revenue: `₱${newRev.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+          };
+        }
+        return prod;
+      });
+      window.localStorage.setItem("sariledger-products", JSON.stringify(next));
+      return next;
+    });
+
+    setReceipts((current) => {
+      const next = [params.receipt, ...current];
+      window.localStorage.setItem("sariledger-receipts", JSON.stringify(next));
+      return next;
+    });
+
+    if (params.newDebt) {
+      setDebts((current) => {
+        const next = [params.newDebt!, ...current];
+        window.localStorage.setItem("sariledger-debts", JSON.stringify(next));
+        return next;
+      });
+    }
+
+    setStoreTransactions((current) => {
+      const next = [params.transaction, ...current];
+      window.localStorage.setItem("sariledger-transactions", JSON.stringify(next));
+      return next;
+    });
+
+    setShowPosModal(false);
+    setSelectedReceiptModal(params.receipt);
+    showNotice(`Sale recorded: Receipt #${params.receipt.id} (₱${params.receipt.total.toFixed(2)})`);
+  };
   const saveBusinessProfile = (profile: BusinessProfile) => {
     setBusinessProfile(profile);
     window.localStorage.setItem("sariledger-business-profile", JSON.stringify(profile));
@@ -1307,6 +2082,8 @@ export default function App() {
           <button onClick={() => navigate("/search")} aria-label="Search" className="grid size-9 place-items-center rounded-xl text-muted transition hover:bg-canvas hover:text-ink"><Icon name="search" className="size-[18px]" /></button>
           <button onClick={() => navigate("/notifications")} aria-label="Notifications" className="relative grid size-9 place-items-center rounded-xl text-muted transition hover:bg-canvas hover:text-ink"><Icon name="bell" className="size-[18px]" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-white" /></button>
           <button onClick={toggleUiMode} aria-pressed={uiMode === "basic"} title={`Switch to ${uiMode === "standard" ? "Basic" : "Standard"} mode`} className={`flex h-9 items-center gap-2 rounded-xl border px-2.5 text-[10px] font-bold transition sm:px-3 ${uiMode === "basic" ? "border-brand bg-emerald-50 text-brand" : "border-line bg-white text-muted hover:text-ink"}`}><Icon name={uiMode === "basic" ? "spark" : "grid"} className="size-4" /><span className="hidden sm:inline">{uiMode === "basic" ? "Basic mode" : "Standard mode"}</span></button>
+          <button onClick={() => setShowPosModal(true)} className="ml-1 hidden items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-800/20 transition hover:bg-emerald-800 sm:flex"><Icon name="cash" className="size-4" />Record Sale (POS)</button>
+          <button onClick={() => setShowPosModal(true)} aria-label="Record Sale (POS)" className="ml-1 grid size-9 place-items-center rounded-xl bg-emerald-700 text-white sm:hidden"><Icon name="cash" className="size-4" /></button>
           <button onClick={() => startEntry()} className="ml-1 hidden items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-brand/15 transition hover:bg-brand-dark sm:flex"><Icon name="plus" className="size-4" />New entry</button>
           <button onClick={() => startEntry()} aria-label="New entry" className="ml-1 grid size-9 place-items-center rounded-xl bg-brand text-white sm:hidden"><Icon name="plus" className="size-4" /></button>
         </div>
@@ -1420,7 +2197,7 @@ export default function App() {
               <section className="rounded-2xl border border-line bg-white p-5 shadow-card">
                 <div className="flex items-center justify-between"><h2 className="text-sm font-bold">Top-selling this month</h2><button onClick={() => navigate("/reports/products")} className="text-[10px] font-bold text-brand">Product report</button></div>
                 <div className="mt-4 space-y-3">
-                  {[...productCatalog].sort((a,b) => b.unitsSold - a.unitsSold).slice(0,3).map((product,index) => (
+                  {[...products].sort((a,b) => b.unitsSold - a.unitsSold).slice(0,3).map((product,index) => (
                     <button key={product.slug} onClick={() => navigate(`/inventory/products/${product.slug}`)} className="flex w-full items-center gap-3 text-left"><span className="grid size-7 place-items-center rounded-lg bg-canvas text-[10px] font-bold text-muted">{index + 1}</span><p className="min-w-0 flex-1 truncate text-xs font-semibold">{product.name}</p><p className="text-[10px] text-muted">{product.unitsSold} sold</p></button>
                   ))}
                 </div>
@@ -1430,9 +2207,77 @@ export default function App() {
         </div>
         )
         ) : (
-          <WorkspacePage pathname={location.pathname} search={location.search} navigate={navigate} notify={showNotice} activityLog={activityLog} periods={periods} selectedPeriod={selectedPeriod} onSelectPeriod={selectPeriod} onUpdatePeriodCheck={updatePeriodCheck} businessProfile={businessProfile} onSaveBusiness={saveBusinessProfile} onSignOut={signOut} basicMode={uiMode === "basic"} />
+          <WorkspacePage
+            pathname={location.pathname}
+            search={location.search}
+            navigate={navigate}
+            notify={showNotice}
+            activityLog={activityLog}
+            periods={periods}
+            selectedPeriod={selectedPeriod}
+            onSelectPeriod={selectPeriod}
+            onUpdatePeriodCheck={updatePeriodCheck}
+            businessProfile={businessProfile}
+            onSaveBusiness={saveBusinessProfile}
+            onSignOut={signOut}
+            basicMode={uiMode === "basic"}
+            products={products}
+            categories={categories}
+            debts={debts}
+            pendingPayments={pendingPayments}
+            supplierOrders={supplierOrders}
+            receipts={receipts}
+            storeTransactions={storeTransactions}
+            onOpenPos={() => setShowPosModal(true)}
+            onOpenAddProduct={() => setShowAddProductModal(true)}
+            onEditProduct={(p) => setEditingProduct(p)}
+            onViewReceipt={(r) => setSelectedReceiptModal(r)}
+            onAddDebt={handleAddDebt}
+            onRecordDebtPayment={handleRecordDebtPayment}
+            onAddPendingPayment={handleAddPendingPayment}
+            onSettlePayment={handleSettlePayment}
+            onCreateSupplierOrder={handleCreateSupplierOrder}
+            onMarkSupplierOrderReceived={handleMarkSupplierOrderReceived}
+          />
         )}
       </main>
+
+      {showPosModal && (
+        <PosSalesModal
+          products={products}
+          onClose={() => setShowPosModal(false)}
+          onCompleteSale={handleCompleteSale}
+          categories={categories}
+        />
+      )}
+
+      {showAddProductModal && (
+        <AddProductModal
+          categories={categories}
+          onClose={() => setShowAddProductModal(false)}
+          onSave={handleSaveProduct}
+        />
+      )}
+
+      {editingProduct && (
+        <EditProductModal
+          product={editingProduct}
+          categories={categories}
+          onClose={() => setEditingProduct(null)}
+          onSave={handleSaveProduct}
+        />
+      )}
+
+      {selectedReceiptModal && (
+        <ReceiptModal
+          receipt={selectedReceiptModal}
+          storeName={businessProfile.name}
+          storeAddress={businessProfile.address}
+          storePhone={businessProfile.phone}
+          storeTaxId={businessProfile.taxId}
+          onClose={() => setSelectedReceiptModal(null)}
+        />
+      )}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex h-17 items-center justify-around border-t border-line bg-white/95 px-2 backdrop-blur lg:hidden">
         {navigation.filter((item) => item.label !== "Team").map((item) => (

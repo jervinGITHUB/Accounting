@@ -1,0 +1,6 @@
+{
+  "name": "SariLedger - Mini Mart System",
+  "description": "Retail accounting and inventory management system for mini marts, grocery stores, and retail businesses.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
